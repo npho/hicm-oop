@@ -42,7 +42,24 @@ os.environ.update(
 JOBS = json.loads((ROOT / "render_jobs.json").read_text())
 DISCOVER = False
 ALIAS = ROOT / "input_aliases.json"
-aliases = json.loads(ALIAS.read_text()) if ALIAS.exists() else {}
+_PACKAGE = "{PACKAGE}"
+
+
+def _portable(key):
+    """Replace this machine's package path with the {PACKAGE} placeholder."""
+    if key == str(ROOT) or key.startswith(str(ROOT) + os.sep):
+        return _PACKAGE + key[len(str(ROOT)) :]
+    return key
+
+
+aliases = (
+    {
+        k.replace(_PACKAGE, str(ROOT)): v
+        for k, v in json.loads(ALIAS.read_text()).items()
+    }
+    if ALIAS.exists()
+    else {}
+)
 used = []
 BASE = Path("/Users/adelosan/Documents/Codex/2026-09-26/what-i")
 
@@ -103,7 +120,7 @@ def resolve(path):
     aliases[key] = str(q.resolve().relative_to(ROOT))
     used.append(
         dict(
-            request=key,
+            request=_portable(key),
             file=aliases[key],
             sha256=hashlib.sha256(q.read_bytes()).hexdigest(),
         )
@@ -210,7 +227,9 @@ for job in names:
         error = repr(ex)
         traceback.print_exc()
     finally:
-        ALIAS.write_text(json.dumps(aliases, indent=2))
+        ALIAS.write_text(
+            json.dumps({_portable(k): v for k, v in aliases.items()}, indent=2)
+        )
         (ROOT / "audit" / ("inputs_" + job + ".json")).write_text(
             json.dumps(used, indent=2)
         )

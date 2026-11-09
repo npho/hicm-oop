@@ -19,7 +19,8 @@ for ref, src in m.items():
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(p, dest)
 for key, ref in req.items():
-    aliases[key.replace("{PACKAGE}", str(B))] = os.path.relpath(R / m[ref], B)
+    # Keep the {PACKAGE} placeholder on disk; run_figures.py expands it on load.
+    aliases[key] = os.path.relpath(R / m[ref], B)
 (B / "input_aliases.json").write_text(json.dumps(aliases, indent=2))
 (B / "reports/render_input_preparation.json").write_text(
     json.dumps({"missing": missing, "mapping": m}, indent=2)
