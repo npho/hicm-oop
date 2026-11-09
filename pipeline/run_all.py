@@ -79,7 +79,7 @@ run("verify_inputs.py")
     json.dumps(
         {
             "analysis_stages": sum(s["name"] in done for s in stages),
-            "run_directory": str(R),
+            "run_directory": str(R.relative_to(B.parent)),
             "status": "PASS",
             "scope": "Fresh analyses from declared processed inputs plus all figure drawing jobs",
         },
