@@ -59,7 +59,8 @@ def main():
     stage = {stage["name"]: stage for stage in stages}[name]
     check_dependencies(run_dir, stage)
     script = run_dir / stage["script"]
-    assert script.is_file(), script
+    if not script.is_file():
+        raise FileNotFoundError(f"Stage script not found: {script}")
     (run_dir / "logs").mkdir(exist_ok=True)
     (run_dir / "status").mkdir(exist_ok=True)
 
