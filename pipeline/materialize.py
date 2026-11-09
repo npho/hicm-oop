@@ -50,4 +50,8 @@ for row in json.loads((B / "input_manifest.json").read_text()):
 for rel in json.loads((B / "workspace_directories.json").read_text()):
     (R / rel).mkdir(parents=True, exist_ok=True)
 (R / "path_replacements.json").write_text(json.dumps(changes, indent=2))
-print("Workspace ready:", R, "— only code and declared inputs supplied")
+print(
+    "Workspace ready:",
+    R.relative_to(B.parent),
+    "— only code and declared inputs supplied",
+)
