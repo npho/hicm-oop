@@ -26,8 +26,8 @@ seeds, pinned versions) without explicit sign-off.
 
 Status per file: received → formatted → reviewed → findings resolved.
 
-- [ ] `run_all.py` — reviewed; resolve F1–F3, F7, F8
-- [ ] `run_stage.py` — reviewed; resolve F4–F6, F8
+- [ ] `run_all.py` — reviewed; F1, F7, F8 fixed; F2, F3 open
+- [ ] `run_stage.py` — reviewed; F4, F5, F8 fixed; F6 open
 - [ ] `materialize.py` — resolve F13
 - [ ] `run_integrity.py` — resolve F10, F11
 - [ ] `stage_guard.py`
@@ -107,14 +107,14 @@ by evidence rather than line by line.
 
 | ID | Where | Finding | Proposed action | Status |
 | -- | ----- | ------- | --------------- | ------ |
-| F1 | `run_all.py` | `pipeline/reports/` and `pipeline/audit/` are created only by `code/reproduce.py:59`; running `run_all.py` directly, as its docstring documents, fails after all 47 stages | Create the folders in `run_all.py` or in each writer | Open |
+| F1 | `run_all.py` | `pipeline/reports/` and `pipeline/audit/` are created only by `code/reproduce.py:59`; running `run_all.py` directly, as its docstring documents, fails after all 47 stages | Create the folders in `run_all.py` or in each writer | Fixed in `run_all.py` (4681a80) |
 | F2 | `run_all.py:77` | `verify_inputs.py` runs after all analyses, too late to prevent a bad run (`materialize.py` already checks input hashes) | Move before `materialize`, or drop as redundant | Open |
 | F3 | `run_all.py:52-69` | Hand-coded file copies and `prepare_display_tables.py` before two stages are dependencies missing from `stages.json` | Document; consider moving into `stages.json` | Open |
-| F4 | `run_stage.py:41-44` | Stage output goes only to its log; a failure surfaces as a bare `CalledProcessError` | Print the log tail on failure | Open |
-| F5 | launchers | `assert` used for runtime checks (about 32), skipped under `python -O` | Raise explicit exceptions | Open |
+| F4 | `run_stage.py:41-44` | Stage output goes only to its log; a failure surfaces as a bare `CalledProcessError` | Print the log tail on failure | Fixed (2705207) |
+| F5 | launchers | `assert` used for runtime checks (about 32), skipped under `python -O` | Raise explicit exceptions | `run_stage.py` fixed (025b166); other launchers open |
 | F6 | `run_stage.py:35` | `Rscript` taken from `PATH`; R version not enforced | Check `R.version` or resolve R via rig | Open |
-| F7 | `run_all.py:10` | Positional `sys.argv` parsing; `--resume` before the path is misread as the directory | Use `argparse` | Open |
-| F8 | launchers | Single-letter globals, multi-imports, mid-file import, no `main()`, missing docstrings, long lines | Restyle | Open |
+| F7 | `run_all.py:10` | Positional `sys.argv` parsing; `--resume` before the path is misread as the directory | Use `argparse` | Fixed (f8666f4) |
+| F8 | launchers | Single-letter globals, multi-imports, mid-file import, no `main()`, missing docstrings, long lines | Restyle | `run_all.py` (f718f78), `run_stage.py` (4058727) done; other launchers open |
 | F9 | `code/extend_analysis.py:101` | Patch `.replace("W=P.parents[2]", ...)` never matches: the target already reads `W = P.parents[1]` (formatted, see `validation/black_pipeline.log`) | Remove the dead patch | Open |
 | F10 | `run_integrity.py` | Receipt does not hash `code/`, so edits there pass a resume check | Add `code/` to the code snapshot | Open |
 | F11 | `run_integrity.py` | Receipt recorded twice (`run_all.py` and `code/reproduce.py`); the second overwrites the first | Record once | Open |
