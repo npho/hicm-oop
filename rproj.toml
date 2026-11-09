@@ -1,0 +1,7 @@
+[project]
+name = "hicm-oop"
+version = "0.1.0"
+type = "project"
+
+[dependencies]
+R = "4.4.2"
