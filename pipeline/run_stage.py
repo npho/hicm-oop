@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 
 PIPELINE = Path(__file__).resolve().parent
+LOG_TAIL_LINES = 30
 
 
 def check_dependencies(run_dir, stage):
@@ -49,6 +50,14 @@ def stage_command(run_dir, script):
         return ["Rscript", str(script)]
     guard = PIPELINE / "stage_guard.py"
     return [sys.executable, str(guard), str(run_dir), str(script)]
+
+
+def print_log_tail(run_dir, log):
+    """Print the end of a failed stage's log to stderr, where callers see it."""
+    lines = (run_dir / log).read_text(errors="replace").splitlines()
+    tail = lines[-LOG_TAIL_LINES:]
+    print(f"--- last {len(tail)} lines of {log} ---", file=sys.stderr)
+    print("\n".join(tail), file=sys.stderr, flush=True)
 
 
 def main():
@@ -86,6 +95,8 @@ def main():
     }
     (run_dir / "status" / (name + ".json")).write_text(json.dumps(record, indent=2))
     print(json.dumps(record), flush=True)
+    if result.returncode != 0:
+        print_log_tail(run_dir, record["log"])
     return result.returncode
 
 
