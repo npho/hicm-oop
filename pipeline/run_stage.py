@@ -1,57 +1,92 @@
-"""Run an explicit analysis stage in the isolated workspace and retain its status.
-Use materialize.py + prepare_primary_inputs.py first. This command never substitutes
-an archived result if a producer fails. Failure is recorded and propagated.
+"""Run one analysis stage in the isolated workspace and record its status.
+
+Usage: python run_stage.py RUN_DIRECTORY STAGE_NAME
+
+Run materialize.py and prepare_primary_inputs.py first. A failing producer is
+never replaced by an archived result: the failure is recorded in
+status/STAGE_NAME.json and returned as this script's exit code.
 """
 
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import time
 from pathlib import Path
-import sys, json, os, subprocess, time, hashlib
 
-B = Path(__file__).resolve().parent
-R = Path(sys.argv[1]).resolve()
-name = sys.argv[2]
-stages = {s["name"]: s for s in json.loads((B / "stages.json").read_text())}
-s = stages[name]
-for dependency in s["depends"]:
-    p = R / "status" / (dependency + ".json")
-    if not p.exists() or json.loads(p.read_text()).get("status") != "PASS":
-        raise RuntimeError("Prerequisite has not passed: " + dependency)
-script = R / s["script"]
-assert script.is_file(), script
-(R / "logs").mkdir(exist_ok=True)
-(R / "status").mkdir(exist_ok=True)
-env = os.environ.copy()
-env.update(
-    ICM_ARCHIVE_ROOT=str(R / "archive"),
-    ICM_WORK_ROOT=str(R / "archive/work"),
-    ICM_OUTPUT_ROOT=str(R / "legacy"),
-    OPENBLAS_NUM_THREADS="1",
-    OMP_NUM_THREADS="1",
-    MKL_NUM_THREADS="1",
-    MPLCONFIGDIR=str(R / "cache/mpl"),
-    NUMBA_CACHE_DIR=str(R / "cache/numba"),
-    XDG_CACHE_HOME=str(R / "cache"),
-)
-command = (
-    ["Rscript", str(script)]
-    if script.suffix == ".R"
-    else [sys.executable, str(B / "stage_guard.py"), str(R), str(script)]
-)
-start = time.time()
-print("START", name, flush=True)
-with (R / "logs" / (name + ".log")).open("w") as f:
-    res = subprocess.run(
-        command, cwd=R / "current", env=env, stdout=f, stderr=subprocess.STDOUT
+PIPELINE = Path(__file__).resolve().parent
+
+
+def check_dependencies(run_dir, stage):
+    """Raise unless every stage this one depends on has passed."""
+    for dependency in stage["depends"]:
+        path = run_dir / "status" / (dependency + ".json")
+        if not path.exists() or json.loads(path.read_text()).get("status") != "PASS":
+            raise RuntimeError("Prerequisite has not passed: " + dependency)
+
+
+def stage_environment(run_dir):
+    """Return the stage environment: workspace roots, one thread, local caches."""
+    env = os.environ.copy()
+    env.update(
+        ICM_ARCHIVE_ROOT=str(run_dir / "archive"),
+        ICM_WORK_ROOT=str(run_dir / "archive/work"),
+        ICM_OUTPUT_ROOT=str(run_dir / "legacy"),
+        OPENBLAS_NUM_THREADS="1",
+        OMP_NUM_THREADS="1",
+        MKL_NUM_THREADS="1",
+        MPLCONFIGDIR=str(run_dir / "cache/mpl"),
+        NUMBA_CACHE_DIR=str(run_dir / "cache/numba"),
+        XDG_CACHE_HOME=str(run_dir / "cache"),
     )
-record = dict(
-    stage=name,
-    status="PASS" if res.returncode == 0 else "FAIL",
-    exit_code=res.returncode,
-    seconds=round(time.time() - start, 2),
-    script=s["script"],
-    script_sha256=hashlib.sha256(script.read_bytes()).hexdigest(),
-    log="logs/" + name + ".log",
-    scope=s["scope"],
-)
-(R / "status" / (name + ".json")).write_text(json.dumps(record, indent=2))
-print(json.dumps(record), flush=True)
-sys.exit(res.returncode)
+    return env
+
+
+def stage_command(run_dir, script):
+    """Return the command that runs an R script, or a Python script under the guard."""
+    if script.suffix == ".R":
+        return ["Rscript", str(script)]
+    guard = PIPELINE / "stage_guard.py"
+    return [sys.executable, str(guard), str(run_dir), str(script)]
+
+
+def main():
+    """Run the named stage, write its log and status, and return its exit code."""
+    run_dir = Path(sys.argv[1]).resolve()
+    name = sys.argv[2]
+    stages = json.loads((PIPELINE / "stages.json").read_text())
+    stage = {stage["name"]: stage for stage in stages}[name]
+    check_dependencies(run_dir, stage)
+    script = run_dir / stage["script"]
+    assert script.is_file(), script
+    (run_dir / "logs").mkdir(exist_ok=True)
+    (run_dir / "status").mkdir(exist_ok=True)
+
+    start = time.time()
+    print("START", name, flush=True)
+    with (run_dir / "logs" / (name + ".log")).open("w") as log:
+        result = subprocess.run(
+            stage_command(run_dir, script),
+            cwd=run_dir / "current",
+            env=stage_environment(run_dir),
+            stdout=log,
+            stderr=subprocess.STDOUT,
+        )
+    record = {
+        "stage": name,
+        "status": "PASS" if result.returncode == 0 else "FAIL",
+        "exit_code": result.returncode,
+        "seconds": round(time.time() - start, 2),
+        "script": stage["script"],
+        "script_sha256": hashlib.sha256(script.read_bytes()).hexdigest(),
+        "log": "logs/" + name + ".log",
+        "scope": stage["scope"],
+    }
+    (run_dir / "status" / (name + ".json")).write_text(json.dumps(record, indent=2))
+    print(json.dumps(record), flush=True)
+    return result.returncode
+
+
+if __name__ == "__main__":
+    sys.exit(main())
