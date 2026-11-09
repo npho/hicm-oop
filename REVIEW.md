@@ -5,10 +5,22 @@ ready for release when every box below is ticked. Findings are numbered (F1,
 F2, …) and referenced from the checklist; record the decision and commit when
 closing one.
 
-**Per-file workflow.** Confirm the file matches `PACKAGE_SHA256.json`, commit it
-as received, commit any `ruff format` changes on their own, then commit each
-logical change separately. Do not change numerical behaviour (thread counts,
+**Order.** Review in execution order: sections 3–6 follow the call chain of a
+notebook run, so each file is reviewed after everything that produces its
+inputs. Jump ahead only on evidence: a finding that affects the file in hand, a
+failed or changed full run, or a release decision that removes files from
+scope. Section 2 comes first. The independent checks (section 7) recompute
+from source data and can be reviewed at any time.
+
+**Per-file workflow.** Confirm the file matches `PACKAGE_SHA256.json` and commit
+it as received; review it and record findings; commit any `ruff format` changes
+on their own; then commit each approved fix separately, and test restructures
+against the previous version. Do not change numerical behaviour (thread counts,
 seeds, pinned versions) without explicit sign-off.
+
+**Cross-file couplings.** Before changing a file, check the couplings table
+below for anything that patches, hashes or names it, and update the table when
+a change adds or removes a coupling.
 
 ## 1. Environment
 
@@ -22,66 +34,75 @@ seeds, pinned versions) without explicit sign-off.
 - [ ] Drop `black` from the dev dependency group (`ruff format` replaces it)
 - [ ] Make the pipeline use the pinned R rather than the first `Rscript` on `PATH` (F6)
 
-## 2. Pipeline launchers (`pipeline/*.py`)
+## 2. Safeguards (before further changes)
 
-Status per file: received → formatted → reviewed → findings resolved.
+- [ ] Keep the verified run's receipt (`pipeline/rebuild/RUN_INTEGRITY.json`,
+      1,944 output hashes) and `results/` hashes as the regression baseline
+- [ ] Inventory cross-file couplings (table below)
+- [ ] Make source patches fail loudly when their target text is missing (F18)
+
+## 3. Setup
 
 - [ ] `run_all.py` — reviewed; F1, F7, F8 fixed; F2, F3 open
-- [ ] `run_stage.py` — reviewed; F4, F5, F8 fixed; F6 open
 - [ ] `materialize.py` — resolve F13
-- [ ] `run_integrity.py` — resolve F10, F11
-- [ ] `stage_guard.py`
 - [ ] `prepare_primary_inputs.py`
-- [ ] `prepare_display_tables.py`
-- [ ] `prepare_render_inputs.py`
-- [ ] `run_figures.py` — includes F17
-- [ ] `document_provenance.py`
-- [ ] `verify_inputs.py`
-- [ ] `verify_code.py`
-- [ ] `validate_workflow.py`
-- [ ] Configuration: `stages.json`, `root_map.json`, `input_manifest.json`,
-      `display_input_map.json`, `render_jobs.json`, `render_requests.json`,
-      `workspace_directories.json`, `environment.json`
-- [ ] Decide fate of legacy `pipeline/requirements.txt` and `requirements-lock.txt`
+- [ ] Configuration read during setup: `root_map.json`, `input_manifest.json`,
+      `workspace_directories.json`, `stages.json`, `environment.json`
 
-## 3. Notebook layer (`code/`)
+## 4. Analysis stages
 
-- [ ] `extend_analysis.py` — source patching first (F9)
-- [ ] `reproduce.py` — includes F15
-- [ ] `check_primary_predictions.py`
-- [ ] `check_expression_and_text.py`
-- [ ] `check_correspondence.py`
-- [ ] `check_genomewide.py`
-- [ ] `check_integrity_guard.py`
-- [ ] `audit_result_annotations.py`
-- [ ] `collect_figures.py`
-- [ ] `collect_source_tables.py`
-- [ ] `rebuild_supplement.py`
-- [ ] `supplement_draw_job.py`
-
-## 4. Entry points
-
-- [ ] `execute_notebook.py`
-- [ ] `verify_package.py`
-- [ ] `Reproduce_ICM_v281.ipynb` — update cell 474fd814 (still cites
-      `requirements-lock.txt`); review the resume heuristic (F15)
-
-## 5. Numerical code (`pipeline/code`, `extensions`, `renderers`)
-
-About 88,500 lines in 504 scripts; 47 stages each name one entry script. Review
-by evidence rather than line by line.
-
+- [ ] `run_stage.py` — reviewed; F4, F5, F8 fixed; F6 open
+- [ ] `stage_guard.py`
 - [ ] Map each stage's entry script and everything it imports or calls
+      (47 stages, one entry script each; about 88,500 lines in
+      `pipeline/code`, `extensions`, `renderers`)
 - [ ] Identify scripts never executed; confirm against
       `validation/EXCLUDED_UNUSED_FRAGMENTS.json`; decide whether to ship them
 - [ ] Trace each main-text figure and the molecular table to its producers
       (`FIGURE_MAP.csv`, `stages.json`) and review those producers in full
-- [ ] Review `pipeline/extensions/` (16 scripts)
-- [ ] Review `pipeline/renderers/` (24 scripts)
 - [ ] Replace hardcoded `/tmp` and `/private/tmp` `MPLCONFIGDIR` values (F16)
-- [ ] Remove source-text patching dependencies, then format and lift the ruff exclusion
 
-## 6. Documentation
+## 5. Figures
+
+- [ ] `prepare_display_tables.py`
+- [ ] `prepare_render_inputs.py`
+- [ ] `run_figures.py` — includes F17
+- [ ] Configuration: `display_input_map.json`, `render_requests.json`,
+      `render_jobs.json`
+- [ ] Review `pipeline/renderers/` (24 scripts)
+
+## 6. Run wrap-up and notebook layer
+
+- [ ] `document_provenance.py`
+- [ ] `verify_inputs.py`
+- [ ] `run_integrity.py` — resolve F10, F11, F12
+- [ ] `code/reproduce.py` — includes F15
+- [ ] `code/extend_analysis.py` — source patching (F9, F18)
+- [ ] Review `pipeline/extensions/` (16 scripts, run by `extend_analysis.py`)
+- [ ] `code/collect_figures.py`
+- [ ] `code/collect_source_tables.py`
+- [ ] `code/rebuild_supplement.py`
+- [ ] `code/supplement_draw_job.py`
+- [ ] Remove source-text patching dependencies, format the numerical code in one
+      commit, lift the ruff exclusion, and confirm a fresh run matches the baseline
+
+## 7. Checks and entry points
+
+- [ ] `code/check_primary_predictions.py`
+- [ ] `code/check_expression_and_text.py`
+- [ ] `code/check_correspondence.py`
+- [ ] `code/check_genomewide.py`
+- [ ] `code/check_integrity_guard.py`
+- [ ] `code/audit_result_annotations.py`
+- [ ] `execute_notebook.py`
+- [ ] `verify_package.py`
+- [ ] `pipeline/verify_code.py`
+- [ ] `pipeline/validate_workflow.py`
+- [ ] `Reproduce_ICM_v281.ipynb` — update cell 474fd814 (still cites
+      `requirements-lock.txt`); review the resume heuristic (F15)
+- [ ] Decide fate of legacy `pipeline/requirements.txt` and `requirements-lock.txt`
+
+## 8. Documentation
 
 - [ ] Merge `README.txt` into `README.md`; remove `README.txt`
 - [ ] `ENVIRONMENT.json` — claims "pip check passed"; align with uv
@@ -90,7 +111,7 @@ by evidence rather than line by line.
 - [ ] Check `DATA_PROVENANCE.csv`, `DATA_LICENSES.txt`, `REFERENCES.txt`
 - [ ] Decide what of `validation/` and `reference/` ships
 
-## 7. Release
+## 9. Release
 
 - [ ] Decide how `data/` is distributed (currently ignored by git)
 - [ ] Ignore generated folders: `pipeline/rebuild*/`, `pipeline/cache/`,
@@ -102,6 +123,22 @@ by evidence rather than line by line.
 - [ ] Fresh full run from a clean clone; all checks pass
 - [ ] Notebook outputs contain no machine-specific paths (`grep /Users/`)
 - [ ] Tag the release
+
+## Couplings
+
+Places where one file depends on another's exact text, name or bytes. A change
+to the right-hand file can silently break the left-hand one.
+
+| Dependent | Depends on | Kind | Fails loudly? |
+| --------- | ---------- | ---- | ------------- |
+| `materialize.py` | historical absolute paths in `pipeline/code/**` (`root_map.json`) | text rewrite (`re.sub`) | No: an unmatched path is left unchanged |
+| `stage_guard.py` | `root_map.json` roots | path checks at run time | To review |
+| `code/extend_analysis.py:82` | paths in `pipeline/extensions/**` (`root_map.json`) | text rewrite (`re.sub`) | No |
+| `code/extend_analysis.py:101` | `W=P.parents[2]` in `figure1_extension/analyze.py` | text patch (`str.replace`) | No: already a no-op (F9) |
+| `run_figures.py` | renderer source, `pd.read_csv` and `np.load` | `exec` with patched I/O | To review |
+| `verify_code.py` | 513 files in `SHA256_CODE.txt` | byte hashes | Yes |
+| `run_integrity.py` | all `pipeline/` code and run outputs | byte hashes | Yes, on resume |
+| `run_all.py`, `run_stage.py` | script paths in `stages.json` | file names | Yes |
 
 ## Findings
 
@@ -124,3 +161,4 @@ by evidence rather than line by line.
 | F15 | `code/reproduce.py`, notebook | Resume chosen by `(REBUILD / "status").is_dir()`, so an interrupted run is resumed and then rejected | Base resume on the receipt's existence | Open |
 | F16 | `pipeline/code`, `extensions`, `renderers` | Hardcoded `/tmp` and `/private/tmp` `MPLCONFIGDIR` | Point at the run's cache folder | Open |
 | F17 | `run_figures.py` | Author-only `--discover` branch hardcodes another user's absolute paths | Remove before release | Open |
+| F18 | source patches | `str.replace` and `re.sub` on source text do nothing when the target text is absent, so a later edit can disable a patch without any error | Route every patch through a helper that checks the expected number of matches | Open |
