@@ -123,6 +123,10 @@ def main():
             "Use an empty run directory or explicitly --resume this generated run."
         )
 
+    # prepare_render_inputs.py, run_figures.py and this script write into these
+    # folders without creating them.
+    for folder in ("reports", "audit"):
+        (PIPELINE / folder).mkdir(exist_ok=True)
     if not resume:
         run("materialize.py", run_dir)
         run("prepare_primary_inputs.py", run_dir)
