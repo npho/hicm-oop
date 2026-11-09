@@ -8,6 +8,7 @@ Archived results never substitute for a failed stage. Every completed stage
 leaves a log and a status file in the run directory.
 """
 
+import argparse
 import json
 import shutil
 import subprocess
@@ -89,12 +90,31 @@ def run_stages(run_dir, stages, done):
         pending.remove(eligible)
 
 
+def parse_args():
+    """Parse the run directory and the --resume flag."""
+    parser = argparse.ArgumentParser(
+        description="Rebuild every analysis and figure from the declared inputs."
+    )
+    parser.add_argument(
+        "run_dir",
+        type=Path,
+        help="new or empty run directory beneath the package directory",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="continue a completed run whose integrity receipt still matches",
+    )
+    return parser.parse_args()
+
+
 def main():
     """Materialize the workspace, run all stages and figures, and record a receipt."""
-    run_dir = Path(sys.argv[1]).resolve()
+    args = parse_args()
+    run_dir = args.run_dir.resolve()
     if PIPELINE not in run_dir.parents:
         raise SystemExit("Create the run directory beneath the package directory.")
-    resume = "--resume" in sys.argv
+    resume = args.resume
 
     if resume:
         verify_run_integrity(PIPELINE, run_dir)
