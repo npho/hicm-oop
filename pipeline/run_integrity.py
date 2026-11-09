@@ -75,7 +75,7 @@ def snapshot(engine, workspace):
             key = str(path.resolve().relative_to(engine.parent))
             inputs[key] = digest(path, memo)
     for path in sorted((engine.parent / "data/source/atlas").glob("*")):
-        if path.is_file():
+        if path.is_file() and not path.name.startswith("."):
             inputs[str(path.relative_to(engine.parent))] = digest(path, memo)
     gene_sets = engine.parent / "data/analysis/systematic_panel/gene_sets.json"
     if gene_sets.exists():

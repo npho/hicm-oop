@@ -12,7 +12,7 @@ R.mkdir(parents=True, exist_ok=True)
 roots = json.loads((B / "root_map.json").read_text())
 changes = []
 for p in (B / "code").rglob("*"):
-    if not p.is_file():
+    if not p.is_file() or p.name.startswith("."):
         continue
     dest = R / p.relative_to(B / "code")
     dest.parent.mkdir(parents=True, exist_ok=True)
