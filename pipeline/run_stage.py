@@ -18,6 +18,16 @@ from pathlib import Path
 PIPELINE = Path(__file__).resolve().parent
 LOG_TAIL_LINES = 30
 
+# The tested R; keep in step with rproj.toml and ENVIRONMENT.json. R 4.4.2
+# bundles Matrix 1.7.1, the only package the R stage uses.
+R_VERSION = "4.4.2"
+MATRIX_VERSION = "1.7.1"
+# Prints R.version.string, then the Matrix version. The integrity receipt
+# records this output, so changing it invalidates existing receipts.
+R_VERSION_PROBE = (
+    'cat(R.version.string,"\\n"); cat(as.character(packageVersion("Matrix")))'
+)
+
 
 def check_dependencies(run_dir, stage):
     """Raise unless every stage this one depends on has passed."""
@@ -44,10 +54,53 @@ def stage_environment(run_dir):
     return env
 
 
+def r_environment(run_dir):
+    """Return the stage environment limited to R's bundled package library.
+
+    Every user and site library variable points at one folder in the run's
+    cache that holds no packages (R creates the R_LIBS_USER folder if it is
+    missing), so only the library R ships with can supply a package.
+    """
+    env = stage_environment(run_dir)
+    empty = str(run_dir / "cache/R/empty-library")
+    env.update(R_LIBS=empty, R_LIBS_USER=empty, R_LIBS_SITE=empty)
+    return env
+
+
+def r_command(*args):
+    """Return an Rscript command that ignores all .Rprofile and .Renviron files."""
+    return ["Rscript", "--vanilla", *args]
+
+
+def r_versions(run_dir):
+    """Return the R and Matrix versions exactly as the R stage would see them."""
+    result = subprocess.run(
+        r_command("-e", R_VERSION_PROBE),
+        cwd=run_dir / "current",
+        env=r_environment(run_dir),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+def check_r(run_dir):
+    """Raise unless the Rscript on PATH is the tested R with its bundled Matrix."""
+    found = r_versions(run_dir)
+    lines = found.splitlines()
+    r_ok = bool(lines) and lines[0].startswith(f"R version {R_VERSION} ")
+    if not r_ok or lines[-1] != MATRIX_VERSION:
+        raise RuntimeError(
+            f"Expected R {R_VERSION} with Matrix {MATRIX_VERSION}; the Rscript on "
+            f"PATH reports {found!r}. With rig, run `rig default 4.4`."
+        )
+
+
 def stage_command(run_dir, script):
     """Return the command that runs an R script, or a Python script under the guard."""
     if script.suffix == ".R":
-        return ["Rscript", str(script)]
+        return r_command(str(script))
     guard = PIPELINE / "stage_guard.py"
     return [sys.executable, str(guard), str(run_dir), str(script)]
 
@@ -70,6 +123,11 @@ def main():
     script = run_dir / stage["script"]
     if not script.is_file():
         raise FileNotFoundError(f"Stage script not found: {script}")
+    if script.suffix == ".R":
+        check_r(run_dir)
+        env = r_environment(run_dir)
+    else:
+        env = stage_environment(run_dir)
     (run_dir / "logs").mkdir(exist_ok=True)
     (run_dir / "status").mkdir(exist_ok=True)
 
@@ -79,7 +137,7 @@ def main():
         result = subprocess.run(
             stage_command(run_dir, script),
             cwd=run_dir / "current",
-            env=stage_environment(run_dir),
+            env=env,
             stdout=log,
             stderr=subprocess.STDOUT,
         )

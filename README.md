@@ -115,9 +115,11 @@ Rscript -e 'cat(R.version.string, "\n"); packageVersion("Matrix")'   # R 4.4.2, 
 
 ### How the pipeline finds R
 
-The pipeline runs the `Rscript` that is first on `PATH`, from inside its run directory,
-so it does not read `.Renviron` or use the project library. It therefore uses rig's
-default R. Before running the notebook, make sure that default is 4.4:
+The pipeline runs the `Rscript` that is first on `PATH` (with rig, its default R), from
+inside its run directory. It runs it with `--vanilla` and with only the package library
+bundled with R, so no `.Rprofile`, `.Renviron`, project library or user-installed
+package can change the result. Before the R stage starts, the pipeline checks for R
+4.4.2 with `Matrix` 1.7.1 and stops otherwise. Make sure rig's default is 4.4:
 
 ```sh
 rig list          # the default is marked with *
