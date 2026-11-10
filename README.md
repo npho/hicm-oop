@@ -34,7 +34,7 @@ uv sync --locked
 This downloads Python 3.10.14 if it is not already available, creates `.venv/`, and
 installs exactly the packages in `uv.lock`. `--locked` makes the command fail rather
 than re-resolve if `pyproject.toml` and `uv.lock` disagree. Add `--no-dev` to skip the
-formatting and linting tools (`black`, `ruff`), which the analysis does not use.
+formatting and linting tool (`ruff`), which the analysis does not use.
 
 ### 3. Check the environment
 
