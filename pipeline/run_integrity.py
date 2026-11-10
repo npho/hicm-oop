@@ -11,7 +11,8 @@ import importlib.metadata
 import json
 import platform
 import shutil
-import subprocess
+
+from run_stage import r_versions
 
 NUMERICAL_SUFFIXES = {
     ".csv",
@@ -111,19 +112,9 @@ def snapshot(engine, workspace):
             runtime[name] = importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:
             runtime[name] = "not installed"
-    rscript = shutil.which("Rscript")
-    if rscript:
-        result = subprocess.run(
-            [
-                rscript,
-                "-e",
-                'cat(R.version.string,"\\n"); cat(as.character(packageVersion("Matrix")))',
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        runtime["R_and_Matrix"] = result.stdout.strip()
+    if shutil.which("Rscript"):
+        # Same command, directory and libraries as the R stage (run_stage.py).
+        runtime["R_and_Matrix"] = r_versions(workspace)
     else:
         runtime["R_and_Matrix"] = "not installed"
     return {
