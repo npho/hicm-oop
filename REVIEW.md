@@ -33,7 +33,8 @@ a change adds or removes a coupling.
 - [x] Commit `.gitignore` rig block; keep `.rvenvlib/` ignored (F19)
 - [x] Commit `README.md` (Python and R sections) (510ebc9; line 37 changes with the
       `black` item below, the R-on-`PATH` section with F6)
-- [ ] Drop `black` from the dev dependency group (`ruff format` replaces it)
+- [x] Drop `black` from the dev dependency group (`ruff format` replaces it)
+      (1e5dd69; leftover constraint pins removed in 1e328aa)
 - [ ] Make the pipeline use the pinned R rather than the first `Rscript` on `PATH` (F6)
 
 ## 2. Safeguards (before further changes)
@@ -108,7 +109,9 @@ a change adds or removes a coupling.
 
 - [ ] Merge `README.txt` into `README.md`; remove `README.txt`; point
       `readme` in `pyproject.toml` at `README.md`
-- [ ] `ENVIRONMENT.json` — claims "pip check passed"; align with uv
+- [ ] `ENVIRONMENT.json` — claims "pip check passed"; align with uv; it lists
+      `black` and its dependencies (`click`, `mypy-extensions`, `pathspec`,
+      `tomli`), which the lock no longer has
 - [ ] Check `COMPREHENSIVE_AUDIT.txt`, `RESULT_HARDCODING_AUDIT.txt`,
       `PREPROCESSING.txt` against the code as released
 - [ ] Check `DATA_PROVENANCE.csv`, `DATA_LICENSES.txt`, `REFERENCES.txt`
