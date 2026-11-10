@@ -31,7 +31,8 @@ a change adds or removes a coupling.
 - [x] Pin R exactly: `R = "= 4.4.2"` in `rproj.toml`, then `rig proj lock`
       (bfa99ee, whose message says 4.2.2 by mistake; lock confirmed current)
 - [x] Commit `.gitignore` rig block; keep `.rvenvlib/` ignored (F19)
-- [ ] Commit `README.md` (Python and R sections)
+- [x] Commit `README.md` (Python and R sections) (510ebc9; line 37 changes with the
+      `black` item below, the R-on-`PATH` section with F6)
 - [ ] Drop `black` from the dev dependency group (`ruff format` replaces it)
 - [ ] Make the pipeline use the pinned R rather than the first `Rscript` on `PATH` (F6)
 
@@ -105,7 +106,8 @@ a change adds or removes a coupling.
 
 ## 8. Documentation
 
-- [ ] Merge `README.txt` into `README.md`; remove `README.txt`
+- [ ] Merge `README.txt` into `README.md`; remove `README.txt`; point
+      `readme` in `pyproject.toml` at `README.md`
 - [ ] `ENVIRONMENT.json` — claims "pip check passed"; align with uv
 - [ ] Check `COMPREHENSIVE_AUDIT.txt`, `RESULT_HARDCODING_AUDIT.txt`,
       `PREPROCESSING.txt` against the code as released
@@ -164,3 +166,6 @@ to the right-hand file can silently break the left-hand one.
 | F17 | `run_figures.py` | Author-only `--discover` branch hardcodes another user's absolute paths | Remove before release | Open |
 | F18 | source patches | `str.replace` and `re.sub` on source text do nothing when the target text is absent, so a later edit can disable a patch without any error | Route every patch through a helper that checks the expected number of matches | Open |
 | F19 | `.gitignore`, `.rvenvlib/` | `/.rvenvlib/` is ignored inside rig's managed `# rig rvenv` block, so `rig proj lock`/`sync` (which `README.md` tells users to run) deletes the line and `.rvenvlib/` shows as untracked; the block's comment and `.rvenvlib/.gitignore` both say the shim is committed; a fresh clone warns "package 'rvenv' … was not found" until `rig proj sync` | Either commit `.rvenvlib/` as rig intends, or keep it ignored with the rule moved outside rig's markers and the comment corrected | Kept ignored; rule moved after rig's block, which survives `rig proj lock`/`sync` (bd77b97) |
+| F20 | `run_integrity.py:114-126` | The R fingerprint runs `Rscript` in the caller's working directory, while the stage runs in `<run>/current`; launched from the repository root it reads `.Renviron` and the project library, so it could record a different `Matrix` than the stage loads (identical today: `rproj.lock` has no packages) | Run the probe from the same directory as the stage | Open |
+| F21 | `run_integrity.py:106` | Fingerprints `python-igraph`, which is not installed (the distribution is `igraph` 1.0.0); the verified receipt records `"python-igraph": "not installed"`, so a changed igraph (Leiden clustering) passes a resume check | Fingerprint `igraph` | Open |
+| F22 | working tree | 70 files differ from `PACKAGE_SHA256.json` and root `requirements.txt`, `requirements-lock.txt` are missing. `README.txt` and `Reproduce_ICM_v281.ipynb` were edited before review (uv migration); most others (`results/`, `pipeline/figure_notes/`, `data/analytic/`, some `validation/` CSVs) were rewritten by the verified run. The original archive (`~/Downloads/ICM_v281_collaborator_comprehensive.zip`) matches the manifest for all 1,196 files | Take each "as received" commit from the archive, not the working tree, then commit the local change separately; decide whether run-rewritten outputs ship as received or as regenerated | Open |
