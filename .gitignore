@@ -12,5 +12,8 @@ __pycache__/
 # be deleted and rebuilt at any time. The committed rvenv shim package lives
 # in .rvenvlib instead.
 /.rvenv/
-/.rvenvlib/
 # rig rvenv end
+
+# rig rewrites the block above and expects .rvenvlib/ to be committed. This
+# project does not commit it: `rig proj sync` rebuilds it on each machine.
+/.rvenvlib/
