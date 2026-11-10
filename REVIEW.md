@@ -28,8 +28,9 @@ a change adds or removes a coupling.
 - [x] Skip dotfiles (`.DS_Store`) when walking pipeline folders
 - [x] Show and record run paths relative to the repository root
 - [x] ruff configuration (PEP 8, Google docstrings, received code excluded)
-- [ ] Pin R exactly: `R = "= 4.4.2"` in `rproj.toml`, then `rig proj lock`
-- [ ] Commit `.gitignore` rig block and `.rvenvlib/`
+- [x] Pin R exactly: `R = "= 4.4.2"` in `rproj.toml`, then `rig proj lock`
+      (bfa99ee, whose message says 4.2.2 by mistake; lock confirmed current)
+- [x] Commit `.gitignore` rig block; keep `.rvenvlib/` ignored (F19)
 - [ ] Commit `README.md` (Python and R sections)
 - [ ] Drop `black` from the dev dependency group (`ruff format` replaces it)
 - [ ] Make the pipeline use the pinned R rather than the first `Rscript` on `PATH` (F6)
@@ -162,3 +163,4 @@ to the right-hand file can silently break the left-hand one.
 | F16 | `pipeline/code`, `extensions`, `renderers` | Hardcoded `/tmp` and `/private/tmp` `MPLCONFIGDIR` | Point at the run's cache folder | Open |
 | F17 | `run_figures.py` | Author-only `--discover` branch hardcodes another user's absolute paths | Remove before release | Open |
 | F18 | source patches | `str.replace` and `re.sub` on source text do nothing when the target text is absent, so a later edit can disable a patch without any error | Route every patch through a helper that checks the expected number of matches | Open |
+| F19 | `.gitignore`, `.rvenvlib/` | `/.rvenvlib/` is ignored inside rig's managed `# rig rvenv` block, so `rig proj lock`/`sync` (which `README.md` tells users to run) deletes the line and `.rvenvlib/` shows as untracked; the block's comment and `.rvenvlib/.gitignore` both say the shim is committed; a fresh clone warns "package 'rvenv' … was not found" until `rig proj sync` | Either commit `.rvenvlib/` as rig intends, or keep it ignored with the rule moved outside rig's markers and the comment corrected | Kept ignored; rule moved after rig's block, which survives `rig proj lock`/`sync` (bd77b97) |
