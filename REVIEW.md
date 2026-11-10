@@ -35,7 +35,7 @@ a change adds or removes a coupling.
       `black` item below, the R-on-`PATH` section with F6)
 - [x] Drop `black` from the dev dependency group (`ruff format` replaces it)
       (1e5dd69; leftover constraint pins removed in 1e328aa)
-- [ ] Make the pipeline use the pinned R rather than the first `Rscript` on `PATH` (F6)
+- [x] Make the pipeline use the pinned R rather than the first `Rscript` on `PATH` (F6)
 
 ## 2. Safeguards (before further changes)
 
@@ -54,7 +54,7 @@ a change adds or removes a coupling.
 
 ## 4. Analysis stages
 
-- [ ] `run_stage.py` — reviewed; F4, F5, F8 fixed; F6 open
+- [ ] `run_stage.py` — reviewed; F4, F5, F6, F8 fixed
 - [ ] `stage_guard.py`
 - [ ] Map each stage's entry script and everything it imports or calls
       (47 stages, one entry script each; about 88,500 lines in
@@ -145,6 +145,8 @@ to the right-hand file can silently break the left-hand one.
 | `verify_code.py` | 513 files in `SHA256_CODE.txt` | byte hashes | Yes |
 | `run_integrity.py` | all `pipeline/` code and run outputs | byte hashes | Yes, on resume |
 | `run_all.py`, `run_stage.py` | script paths in `stages.json` | file names | Yes |
+| `run_integrity.py` | `run_stage.r_versions` and `R_VERSION_PROBE` | import; receipt records the probe's output | Yes: a changed probe changes `runtime` and fails resume |
+| `run_stage.py` `R_VERSION`, `MATRIX_VERSION` | `rproj.toml`, `ENVIRONMENT.json` | duplicated version numbers | Yes, at the R stage, if the installed R differs; No if only the files drift apart |
 
 ## Findings
 
@@ -155,7 +157,7 @@ to the right-hand file can silently break the left-hand one.
 | F3 | `run_all.py:52-69` | Hand-coded file copies and `prepare_display_tables.py` before two stages are dependencies missing from `stages.json` | Document; consider moving into `stages.json` | Open |
 | F4 | `run_stage.py:41-44` | Stage output goes only to its log; a failure surfaces as a bare `CalledProcessError` | Print the log tail on failure | Fixed (2705207) |
 | F5 | launchers | `assert` used for runtime checks (about 32), skipped under `python -O` | Raise explicit exceptions | `run_stage.py` fixed (025b166); other launchers open |
-| F6 | `run_stage.py:35` | `Rscript` taken from `PATH`; R version not enforced | Check `R.version` or resolve R via rig | Open |
+| F6 | `run_stage.py:50` | `Rscript` taken from `PATH`; R version not enforced. The stage also inherits the caller's environment and, with no startup files in `<run>/current`, reads `~/.Rprofile`, `~/.Renviron` and the user library, which precedes R's bundled library even under `--vanilla`: a user-installed `Matrix` would silently replace 1.7.1. A wrong R is caught only by a later resume check, never on a fresh run | Check `R.version` or resolve R via rig; isolate R from user startup files and libraries | Fixed: `--vanilla`, bundled library only, version check before the stage; outputs byte-identical (baf1876) |
 | F7 | `run_all.py:10` | Positional `sys.argv` parsing; `--resume` before the path is misread as the directory | Use `argparse` | Fixed (f8666f4) |
 | F8 | launchers | Single-letter globals, multi-imports, mid-file import, no `main()`, missing docstrings, long lines | Restyle | `run_all.py` (f718f78), `run_stage.py` (4058727) done; other launchers open |
 | F9 | `code/extend_analysis.py:101` | Patch `.replace("W=P.parents[2]", ...)` never matches: the target already reads `W = P.parents[1]` (formatted, see `validation/black_pipeline.log`) | Remove the dead patch | Open |
@@ -169,6 +171,7 @@ to the right-hand file can silently break the left-hand one.
 | F17 | `run_figures.py` | Author-only `--discover` branch hardcodes another user's absolute paths | Remove before release | Open |
 | F18 | source patches | `str.replace` and `re.sub` on source text do nothing when the target text is absent, so a later edit can disable a patch without any error | Route every patch through a helper that checks the expected number of matches | Open |
 | F19 | `.gitignore`, `.rvenvlib/` | `/.rvenvlib/` is ignored inside rig's managed `# rig rvenv` block, so `rig proj lock`/`sync` (which `README.md` tells users to run) deletes the line and `.rvenvlib/` shows as untracked; the block's comment and `.rvenvlib/.gitignore` both say the shim is committed; a fresh clone warns "package 'rvenv' … was not found" until `rig proj sync` | Either commit `.rvenvlib/` as rig intends, or keep it ignored with the rule moved outside rig's markers and the comment corrected | Kept ignored; rule moved after rig's block, which survives `rig proj lock`/`sync` (bd77b97) |
-| F20 | `run_integrity.py:114-126` | The R fingerprint runs `Rscript` in the caller's working directory, while the stage runs in `<run>/current`; launched from the repository root it reads `.Renviron` and the project library, so it could record a different `Matrix` than the stage loads (identical today: `rproj.lock` has no packages) | Run the probe from the same directory as the stage | Open |
+| F20 | `run_integrity.py:114-126` | The R fingerprint runs `Rscript` in the caller's working directory, while the stage runs in `<run>/current`; launched from the repository root it reads `.Renviron` and the project library, so it could record a different `Matrix` than the stage loads (identical today: `rproj.lock` has no packages) | Run the probe from the same directory as the stage | Fixed: shares `run_stage.r_versions`; recorded value unchanged (8baf231) |
 | F21 | `run_integrity.py:106` | Fingerprints `python-igraph`, which is not installed (the distribution is `igraph` 1.0.0); the verified receipt records `"python-igraph": "not installed"`, so a changed igraph (Leiden clustering) passes a resume check | Fingerprint `igraph` | Open |
 | F22 | working tree | 70 files differ from `PACKAGE_SHA256.json` and root `requirements.txt`, `requirements-lock.txt` are missing. `README.txt` and `Reproduce_ICM_v281.ipynb` were edited before review (uv migration); most others (`results/`, `pipeline/figure_notes/`, `data/analytic/`, some `validation/` CSVs) were rewritten by the verified run. The original archive (`~/Downloads/ICM_v281_collaborator_comprehensive.zip`) matches the manifest for all 1,196 files | Take each "as received" commit from the archive, not the working tree, then commit the local change separately; decide whether run-rewritten outputs ship as received or as regenerated | Open |
+| F23 | `run_stage.py:50`, `stage_guard.py` | The R stage runs without `stage_guard.py`, so its reads are neither restricted to the run nor recorded; today the run's copy of `export_cultures.R` has every path rewritten into the run directory | Review with `stage_guard.py`; at least check the materialized R script for historical roots | Open |
