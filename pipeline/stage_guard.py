@@ -21,7 +21,18 @@ import sys
 from pathlib import Path
 
 PIPELINE = Path(__file__).resolve().parent
-HISTORICAL_ROOTS = list(json.loads((PIPELINE / "root_map.json").read_text()).values())
+HISTORICAL_ROOTS = [
+    Path(root).resolve()
+    for root in json.loads((PIPELINE / "root_map.json").read_text()).values()
+]
+# The real home directory counts as well as the usual locations, so a package
+# unpacked elsewhere (for example under /srv) is still protected.
+HOME_PREFIXES = ("/Users/", "/home/", str(Path.home()) + "/")
+
+
+def inside(path, roots):
+    """Return whether path is one of roots or lies beneath one of them."""
+    return any(path.is_relative_to(root) for root in roots)
 
 
 def install_guard(run_dir):
@@ -35,12 +46,12 @@ def install_guard(run_dir):
         script runs.
     """
     seen = set()
+    interpreter = [Path(sys.prefix).resolve(), Path(sys.base_prefix).resolve()]
     allowed = [
         PIPELINE,
         PIPELINE.parent / "data",
         run_dir,
-        Path(sys.prefix).resolve(),
-        Path(sys.base_prefix).resolve(),
+        *interpreter,
     ]
 
     def guard(event, args):
@@ -49,7 +60,6 @@ def install_guard(run_dir):
         if event != "open" or not args or not isinstance(args[0], str | bytes):
             return
         path = Path(os.fsdecode(args[0])).absolute()
-        text = str(path)
         # Permit package inputs, this run and the Python installation; reject other
         # user-home data even when an old script contains an undeclared fallback.
         resolved = path.resolve()
@@ -57,18 +67,14 @@ def install_guard(run_dir):
             raise FileNotFoundError(
                 "Use igraph defaults; user configuration is not an input"
             )
-        if str(resolved).startswith(("/Users/", "/home/")) and not any(
-            resolved == root or root in resolved.parents for root in allowed
-        ):
+        if str(resolved).startswith(HOME_PREFIXES) and not inside(resolved, allowed):
             raise RuntimeError("Undeclared user-home access blocked: " + str(resolved))
-        if (
-            any(text.startswith(root + "/") for root in HISTORICAL_ROOTS)
-            and PIPELINE not in path.parents
-            and not any(text.startswith(p + "/") for p in [sys.prefix, sys.base_prefix])
+        if inside(resolved, HISTORICAL_ROOTS) and not inside(
+            resolved, [PIPELINE, *interpreter]
         ):
-            raise RuntimeError("Historical workspace access blocked: " + text)
+            raise RuntimeError("Historical workspace access blocked: " + str(resolved))
         if run_dir in path.parents:
-            seen.add((text, str(args[1]) if len(args) > 1 else ""))
+            seen.add((str(path), str(args[1]) if len(args) > 1 else ""))
 
     sys.addaudithook(guard)
     return seen
