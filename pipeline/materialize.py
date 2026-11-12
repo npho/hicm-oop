@@ -19,6 +19,15 @@ from source_patch import require_roots, rewrite_roots, unmapped_paths
 PIPELINE = Path(__file__).resolve().parent
 
 
+def sha256_of(path):
+    """Return the SHA-256 hex digest of a file, read in 8 MB blocks."""
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(8 * 1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def copy_code(run_dir):
     """Copy pipeline/code into the run with historical roots rewritten.
 
@@ -67,16 +76,18 @@ def link_inputs(run_dir):
     """
     for row in json.loads((PIPELINE / "input_manifest.json").read_text()):
         if not row["available"]:
-            continue
+            raise FileNotFoundError("Unavailable declared source: " + row["path"])
         source = PIPELINE / row["packaged"]
-        assert hashlib.sha256(source.read_bytes()).hexdigest() == row["sha256"], source
+        if sha256_of(source) != row["sha256"]:
+            raise RuntimeError(f"Declared input differs from its checksum: {source}")
         destination = run_dir / row["root"] / row["path"]
         destination.parent.mkdir(parents=True, exist_ok=True)
         if destination.exists() or destination.is_symlink():
-            assert (
-                destination.resolve() == source.resolve()
-                or hashlib.sha256(destination.read_bytes()).hexdigest() == row["sha256"]
-            )
+            if (
+                destination.resolve() != source.resolve()
+                and sha256_of(destination) != row["sha256"]
+            ):
+                raise RuntimeError(f"Input path holds other data: {destination}")
             continue
         # A relative symlink avoids doubling large files and stays portable with
         # the package directory.
@@ -86,6 +97,8 @@ def link_inputs(run_dir):
 def main():
     """Build the workspace named on the command line."""
     run_dir = Path(sys.argv[1]).resolve()
+    if PIPELINE.parent not in run_dir.parents:
+        raise SystemExit("Create the run directory beneath the package directory.")
     run_dir.mkdir(parents=True, exist_ok=True)
     changes = copy_code(run_dir)
     link_inputs(run_dir)
