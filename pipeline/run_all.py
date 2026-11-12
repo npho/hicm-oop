@@ -57,7 +57,11 @@ def passed_stages(run_dir):
 
 
 def prepare_stage(run_dir, name):
-    """Stage inputs that stages.json does not declare (see REVIEW.md F3)."""
+    """Stage inputs that stages.json does not declare.
+
+    Each copy raises FileNotFoundError if the stage that produces its source has
+    not run, so a missing dependency stops the run instead of passing silently.
+    """
     outputs = run_dir / "current/outputs"
     if name == "remodeling_calibration":
         copy(
@@ -123,6 +127,9 @@ def main():
             "Use an empty run directory or explicitly --resume this generated run."
         )
 
+    # Check the declared inputs before anything is built from them.
+    run("verify_inputs.py")
+
     # prepare_render_inputs.py, run_figures.py and this script write into these
     # folders without creating them.
     for folder in ("reports", "audit"):
@@ -138,7 +145,6 @@ def main():
     run("prepare_render_inputs.py", run_dir)
     run("run_figures.py", "all")
     run("document_provenance.py", run_dir)
-    run("verify_inputs.py")
     last_run = {
         "analysis_stages": sum(stage["name"] in done for stage in stages),
         "run_directory": str(run_dir.relative_to(PIPELINE.parent)),
