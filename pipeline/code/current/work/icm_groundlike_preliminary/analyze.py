@@ -71,8 +71,8 @@ m["detected_fraction"] = (x > 0).mean(1)
 m["study"] = m.Dataset
 m["state"] = m.Manual_Annotations
 m["embryo"] = m["group"]
-for gene in set(
-    lowgenes + pluri + hypo + ["KLF17", "TFCP2L1", "GATA4", "SOX17", "MYCN", "MYCL"]
+for gene in sorted(
+    set(lowgenes + pluri + hypo + ["KLF17", "TFCP2L1", "GATA4", "SOX17", "MYCN", "MYCL"])
 ):
     m[gene] = cpm[:, g.get_loc(gene)]
 # Library-relative cycle score: average within-cell gene percentile, no use of target genes.
