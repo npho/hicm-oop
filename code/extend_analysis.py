@@ -98,7 +98,6 @@ def main():
     for filename in ["pseudotime_cells.csv", "paga_edges.csv"]:
         copy_file(WORK / "legacy/results_v242" / filename, panel / "inputs" / filename)
     source = panel / "analyze.py"
-    source.write_text(source.read_text().replace("W=P.parents[2]", "W=P.parents[1]"))
     run(source)
     run(panel / "render.py")
 
