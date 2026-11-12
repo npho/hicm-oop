@@ -4,13 +4,19 @@ Historical absolute paths are rewritten mechanically, with every replacement log
 """
 
 from pathlib import Path
-import sys, json, shutil, os, hashlib, re
+import sys, json, shutil, os, hashlib
+from collections import Counter
+
+from source_patch import require_roots, rewrite_roots, unmapped_paths
 
 B = Path(__file__).resolve().parent
 R = Path(sys.argv[1]).resolve()
 R.mkdir(parents=True, exist_ok=True)
 roots = json.loads((B / "root_map.json").read_text())
 changes = []
+mapping = {v: str(R / k) for k, v in roots.items()}
+matches = Counter()
+unmapped = {}
 for p in (B / "code").rglob("*"):
     if not p.is_file() or p.name.startswith("."):
         continue
@@ -18,12 +24,7 @@ for p in (B / "code").rglob("*"):
     dest.parent.mkdir(parents=True, exist_ok=True)
     text = p.read_text()
     old = text
-    mapping = {v: str(R / k) for k, v in roots.items()}
-    text = re.sub(
-        "|".join(re.escape(v) for v in sorted(mapping, key=len, reverse=True)),
-        lambda m: mapping[m.group(0)],
-        text,
-    )
+    text = rewrite_roots(text, mapping, matches)
     dest.write_text(text)
     if text != old:
         changes.append(
@@ -32,6 +33,11 @@ for p in (B / "code").rglob("*"):
                 operation="Replace historical root paths with isolated workspace roots",
             )
         )
+    if left := unmapped_paths(text, B.parent):
+        unmapped[str(p.relative_to(B))] = left
+require_roots(matches, roots.values(), "pipeline/code")
+for name, paths in unmapped.items():
+    print("Unmapped historical path left in", name, paths)
 for row in json.loads((B / "input_manifest.json").read_text()):
     if not row["available"]:
         continue

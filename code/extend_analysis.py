@@ -6,10 +6,10 @@ failed analysis stages.
 """
 
 from pathlib import Path
+from collections import Counter
 import hashlib
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -70,17 +70,32 @@ def main():
     """Build flat tables, refit models, then prepare current figure inputs."""
     sys.path.insert(0, str(ENGINE))
     from run_integrity import verify as verify_run_integrity
+    from source_patch import require_roots, rewrite_roots, unmapped_paths
 
     verify_run_integrity(ENGINE, WORK)
     # Copy and relocate only code; never copy cached fits into the workspace.
     mapping = {old: str(WORK / key) for key, old in ROOTS.items()}
-    pattern = "|".join(re.escape(key) for key in sorted(mapping, key=len, reverse=True))
+    matches = Counter()
+    changes = []
     for source in (ENGINE / "extensions").rglob("*.py"):
         dest = OUTPUTS / source.relative_to(ENGINE / "extensions")
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(
-            re.sub(pattern, lambda m: mapping[m.group(0)], source.read_text())
-        )
+        text = source.read_text()
+        rewritten = rewrite_roots(text, mapping, matches)
+        dest.write_text(rewritten)
+        row = {"file": str(source.relative_to(ENGINE))}
+        if rewritten != text:
+            row["operation"] = "Replace historical root paths with run roots"
+            changes.append(row)
+        if left := unmapped_paths(rewritten, PACKAGE):
+            print("Unmapped historical path left in", row["file"], left)
+    # "current" never occurs in the extensions; the other three roots must.
+    require_roots(
+        matches, [ROOTS[name] for name in ("archive", "legacy", "cesfw")], "extensions"
+    )
+    (WORK / "logs/extension_path_replacements.json").write_text(
+        json.dumps(changes, indent=2)
+    )
     for name in [
         "ICM_naive_correspondence_check",
         "ICM_blastoid_correspondence_check",
