@@ -12,7 +12,14 @@ m = m[m.Manual_Annotations.isin(["ICM", "preIm-Epi", "Hypo"])].copy()
 c = pd.read_csv(
     B.parent / "data/source/atlas/Human_Embryo_Counts.csv", index_col=0
 ).loc[m.index]
-assert c.index.is_unique and c.columns.is_unique and (c.to_numpy() >= 0).all()
+if not (c.index.is_unique and c.columns.is_unique):
+    raise ValueError("Count matrix has duplicate cell or gene names")
+if not (c.to_numpy() >= 0).all():
+    raise ValueError("Count matrix has negative or missing counts")
+if not (c.sum(axis=1) > 0).all():
+    raise ValueError("A selected cell has no counts")
+if not (c.to_numpy().astype(np.float32) == c.to_numpy()).all():
+    raise ValueError("Counts are not exactly representable as float32")
 np.savez_compressed(
     O / "expression.npz",
     counts=c.values.astype(np.float32),
